@@ -1,0 +1,320 @@
+---
+title: "Data preprocessing"
+date: "2025-03-04"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: lumen
+---
+
+# Overview
+
+Generate some figures and clean up publicly available data for course material 
+
+1. Clean up data
+2. Generate figures
+
+
+# Pre-processing
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(biomaRt)
+library(dplyr)
+```
+
+
+# Objective 1: Clean up public data 
+
+We obtain the data from here - https://www.ebi.ac.uk/biostudies/arrayexpress/studies/E-GEOD-50760. Also using these tutorials ;
+
+- https://genviz.org/module-04-expression/0004/02/01/DifferentialExpression/
+- https://bioinformatics.ccr.cancer.gov/btep/courses/bioinformatics-for-beginners-b4b-introduction-to-rna-sequencing
+- https://hbctraining.github.io/Intro-to-R/
+- https://github.com/hbctraining/DGE_workshop?tab=readme-ov-file
+
+
+We want to clean the data to make it so that ;
+
+- 20 patients
+  - 15 normal
+  - 15 cancer
+- About 20,000 genes
+
+## Raw counts
+
+Lets read in actual data from an experiment comparing tumor and normal
+
+Read in counts
+
+```{r}
+rawCounts <- read.delim("http://genomedata.org/gen-viz-workshop/intro_to_deseq2/tutorial/E-GEOD-50760-raw-counts.tsv")
+```
+
+Annotate which are protein coding
+
+```{r}
+# Use Ensembl as the BioMart database
+ensembl <- useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
+
+# Example gene list (change this to your list)
+genes <- rawCounts$Gene.Name # mix of coding and non-coding
+
+# Query for gene type
+annot <- getBM(
+  attributes = c("hgnc_symbol", "ensembl_gene_id", "gene_biotype"),
+  filters = "hgnc_symbol",
+  values = genes,
+  mart = ensembl
+)
+```
+
+```{r}
+df_gene <- rawCounts %>% 
+  dplyr::select(Gene.ID, Gene.Name) %>% 
+  dplyr::rename(ensembl_gene_id = Gene.ID) %>% 
+  left_join(annot) %>% 
+  dplyr::filter(gene_biotype == "protein_coding") %>% 
+  dplyr::filter(!is.na(Gene.Name)) %>% 
+  distinct(Gene.Name, .keep_all = TRUE)
+```
+
+Subset the raw counts to these genes
+
+```{r}
+rawCounts_sub <- rawCounts %>% 
+  dplyr::filter(Gene.ID %in% df_gene$ensembl_gene_id)
+```
+
+## Metadata
+
+Read in sample mapping
+
+```{r}
+# Read in the sample mappings
+sampleData <- read.delim("http://genomedata.org/gen-viz-workshop/intro_to_deseq2/tutorial/E-GEOD-50760-experiment-design.tsv")
+```
+
+
+
+# Objective 2: Figure generation
+
+## Random cells of tumor normal
+
+We just want to do a simple comparison, comparing tumor to normals.
+
+```{r}
+# Create a visualization with balls representing normal vs cancer cells
+# Create data for normal cells (more organized pattern)
+set.seed(123)
+normal_cells <- data.frame(
+  x = runif(50, 0, 10),
+  y = runif(50, 0, 10),
+  group = "Normal"
+)
+
+# Create data for cancer cells (more scattered pattern)
+cancer_cells <- data.frame(
+  x = runif(50, 0, 10),
+  y = runif(50, 0, 10),
+  group = "Cancer"
+)
+
+# Combine the data
+all_cells <- rbind(normal_cells, cancer_cells)
+
+# Create the plot
+ggplot(all_cells, aes(x = x, y = y, color = group)) +
+  geom_point(size = 4, alpha = 0.7) +
+  facet_wrap(~ group) +
+  theme_minimal() +
+  labs(title = "Cell Organization: Normal vs Cancer",
+       x = "", y = "") +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank(),
+        strip.text = element_text(size = 12, face = "bold"),
+        plot.title = element_text(hjust = 0.5, size = 14)) +
+  scale_color_manual(values = c("Normal" = "skyblue", "Cancer" = "salmon")) +
+  coord_fixed()
+```
+
+## Five genes with read counts
+
+```{r}
+# Create data for 5 genes
+genes <- paste0("Gene", 1:5)
+n_reads <- 10  # base number of reads
+
+# Create data frame for normal samples with differential expression
+normal_counts <- c(10, 8, 12, 15, 7)  # Different counts for each gene
+normal_data <- data.frame(
+  gene = rep(genes, times = normal_counts),
+  x = runif(sum(normal_counts), 0.2, 0.8),
+  y = rep(5:1, times = normal_counts) + runif(sum(normal_counts), -0.3, 0.3),
+  sample = "Normal"
+)
+
+# Create data frame for tumor samples with differential expression
+tumor_counts <- c(5, 12, 8, 7, 15)  # Different counts for each gene
+tumor_data <- data.frame(
+  gene = rep(genes, times = tumor_counts),
+  x = runif(sum(tumor_counts), 0.2, 0.8),
+  y = rep(5:1, times = tumor_counts) + runif(sum(tumor_counts), -0.3, 0.3),
+  sample = "Tumor"
+)
+
+# Combine the data
+all_data <- rbind(normal_data, tumor_data)
+
+# Create summary data for bar plot
+summary_data <- data.frame(
+  gene = rep(genes, 2),
+  sample = rep(c("Normal", "Tumor"), each = 5),
+  count = c(normal_counts, tumor_counts)
+)
+
+# Create the main plot
+main_plot <- ggplot() +
+  # Add gene rectangles
+  geom_rect(data = data.frame(ymin = 0.5:4.5, ymax = 1.5:5.5, 
+                             xmin = 0, xmax = 1),
+            aes(ymin = ymin, ymax = ymax, xmin = xmin, xmax = xmax),
+            fill = "grey90", color = "black") +
+  # Add read circles
+  geom_point(data = all_data, 
+             aes(x = x, y = y, color = sample),
+             size = 3, alpha = 0.7) +
+  # Facet by sample type
+  facet_wrap(~ sample, nrow = 1) +
+  # Add gene labels
+  scale_y_continuous(breaks = 1:5, labels = rev(genes)) +
+  # Customize theme
+  theme_minimal() +
+  labs(title = "Read Distribution Across 5 Genes",
+       y = "Genes", x = "") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        strip.text = element_text(size = 12, face = "bold"),
+        plot.title = element_text(hjust = 0.5, size = 14)) +
+  scale_color_manual(values = c("Normal" = "skyblue", "Tumor" = "salmon")) +
+  xlim(0, 1)
+
+main_plot
+# # Create the bar plot
+# bar_plot <- ggplot(summary_data, aes(x = gene, y = count, fill = sample)) +
+#   geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+#   scale_fill_manual(values = c("Normal" = "skyblue", "Tumor" = "salmon")) +
+#   theme_minimal() +
+#   labs(x = "", y = "Read Count") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),
+#         panel.grid = element_blank(),
+#         legend.position = "none") +
+#   ylim(0, max(c(normal_counts, tumor_counts)) * 1.1)
+# 
+# # Combine the plots
+# grid.arrange(main_plot, bar_plot, ncol = 2, widths = c(2, 1))
+```
+
+## Generate 20 samples
+
+For 10 samples
+
+```{r}
+# Create data for 5 genes
+genes <- paste0("Gene", 1:5)
+n_samples <- 10  # number of samples per group
+
+# Create sample IDs
+sample_ids <- paste0(rep(c("Normal", "Tumor"), each = n_samples), "_", 1:n_samples)
+
+# Create base expression levels for each gene in normal samples
+normal_base <- c(10, 8, 12, 15, 7)
+
+# Create base expression levels for each gene in tumor samples
+tumor_base <- c(5, 12, 8, 7, 15)
+
+# Create data frame with all samples
+all_data <- data.frame()
+
+# Generate data for each sample with some random variation
+for(i in 1:n_samples) {
+  # Normal samples
+  normal_counts <- round(normal_base * runif(5, 0.8, 1.2))  # Add 20% random variation
+  normal_data <- data.frame(
+    gene = rep(genes, times = normal_counts),
+    x = runif(sum(normal_counts), 0.2, 0.8),
+    y = rep(5:1, times = normal_counts) + runif(sum(normal_counts), -0.3, 0.3),
+    sample = paste0("Normal_", sprintf("%02d",i))
+  )
+  
+  # Tumor samples
+  tumor_counts <- round(tumor_base * runif(5, 0.8, 1.2))  # Add 20% random variation
+  tumor_data <- data.frame(
+    gene = rep(genes, times = tumor_counts),
+    x = runif(sum(tumor_counts), 0.2, 0.8),
+    y = rep(5:1, times = tumor_counts) + runif(sum(tumor_counts), -0.3, 0.3),
+    sample = paste0("Tumor_", sprintf("%02d",i))
+  )
+  
+  all_data <- rbind(all_data, normal_data, tumor_data)
+}
+
+# Create summary data for bar plot
+summary_data <- data.frame(
+  gene = rep(genes, 2),
+  group = rep(c("Normal", "Tumor"), each = 5),
+  count = c(normal_base, tumor_base)
+)
+
+# Create the main plot
+main_plot <- ggplot() +
+  # Add gene rectangles
+  geom_rect(data = data.frame(ymin = 0.5:4.5, ymax = 1.5:5.5, 
+                             xmin = 0, xmax = 1),
+            aes(ymin = ymin, ymax = ymax, xmin = xmin, xmax = xmax),
+            fill = "grey90", color = "black") +
+  # Add read circles
+  geom_point(data = all_data, 
+             aes(x = x, y = y, color = sample),
+             size = 2, alpha = 0.5) +
+  # Facet by sample
+  facet_wrap(~ sample, nrow = 2) +
+  # Add gene labels
+  scale_y_continuous(breaks = 1:5, labels = rev(genes)) +
+  # Customize theme
+  theme_minimal() +
+  labs(title = "Read Distribution Across 5 Genes in 20 Samples",
+       y = "Genes", x = "") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        strip.text = element_text(size = 8),
+        legend.position="none",
+        plot.title = element_text(hjust = 0.5, size = 14)) +
+  scale_color_manual(values = c(
+    rep("skyblue", n_samples),  # Normal samples
+    rep("salmon", n_samples)    # Tumor samples
+  )) +
+  xlim(0, 1)
+
+# Create the bar plot
+bar_plot <- ggplot(summary_data, aes(x = gene, y = count, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+  scale_fill_manual(values = c("Normal" = "skyblue", "Tumor" = "salmon")) +
+  theme_minimal() +
+  labs(x = "", y = "Average Read Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank(),
+        legend.position = "none") +
+  ylim(0, max(c(normal_base, tumor_base)) * 1.1)
+
+# Combine the plots
+grid.arrange(main_plot, bar_plot, ncol = 2, widths = c(3, 1))
+```
