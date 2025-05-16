@@ -3,6 +3,7 @@ title: "Compile metadata"
 date: "2025-03-04"
 output: 
   html_document:
+    code_folding: show
     toc: true
     toc_float:
       collapsed: true
@@ -24,9 +25,11 @@ In the next 2 hours, we will cover the following secions ;
 
 # The question that we will answer
 
-What are the differentially expressed genes between normal cells and cancer cells?
+Cancer is a disease in which some of the body's cells grow uncontrollably and spread to other parts of the body. Cancer is caused by certain changes to genes.   
 
-Cancer is a disease in which some of the body's cells grow uncontrollably and spread to other parts of the body. Cancer is caused by certain changes to genes. 
+**What are the differentially expressed genes between normal cells and cancer cells?**
+
+---
 
 # Introduction to Cancer Bioinformatics
 
@@ -42,6 +45,7 @@ Cancer is a disease in which some of the body's cells grow uncontrollably and sp
 - There are about 20,000 genes in the human genome.
 - Image taken from [National Cancer Institute](https://www.cancer.gov/about-cancer/understanding/what-is-cancer)
 
+---
 
 # Introduction to R and RStudio 
 
@@ -96,14 +100,13 @@ Lets get the sum
 8 + 8 + 9 + 9 + 9 + 11 + 12 + 13 + 13 + 14
 ```
 
-Now the mean
+Now calculate the mean
 
 ```{r}
 (8 + 8 + 9 + 9 + 9 + 11 + 12 + 13 + 13 + 14) / 10
 ```
 
-
-Use in built function in R.
+**Use  built in function in R**
 
 Get the sum
 
@@ -117,11 +120,6 @@ Get the mean
 mean(group1)
 ```
 
-Get the standard deviation
-
-```{r}
-sd(group1)
-```
 
 ## Visuzalize data
 
@@ -136,25 +134,151 @@ barplot(means, names.arg = c("Group 1", "Group 2"),
         ylab = "Mean Height")
 ```
 
-We can show as box plot as well
-
-```{r}
-boxplot(group1, group2,
-        names = c("Group 1", "Group 2"),
-        col = c("skyblue", "salmon"),
-        main = "Boxplot of Plant Heights",
-        ylab = "Height")
-```
 
 ## Statistical test
 
-Perform t-test. The T-test is performed using the `t.test()` function, which essentially tests for the difference in means of a variable between two groups. 
+A *t-test* is a statistical test that is used to compare the means of two groups. It is often used in hypothesis testing to determine whether two groups are different from one another.
+
+\[
+t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2}}}
+\]
+
+where:  
+- \(\bar{x}_1, \bar{x}_2\) are the sample means  
+- \(s_1^2, s_2^2\) are the sample variances  
+- \(n_1, n_2\) are the sample sizes  
+
+
+Variance is simply the spread of the data 
+
+```{r, echo=FALSE}
+library(ggplot2)
+df <- data.frame(
+  value = c(group1, group2),
+  group = c(rep("group1", length(group1)), rep("group2", length(group2)))
+)
+
+# Calculate means and variances
+means <- tapply(df$value, df$group, mean)
+vars <- tapply(df$value, df$group, var)
+
+# Data for variance boxes
+rects <- data.frame(
+  group = c("group1", "group2"),
+  xmin = c(0.7, 1.7),
+  xmax = c(1.3, 2.3),
+  ymin = means - vars/2,
+  ymax = means + vars/2,
+  mean = means,
+  var = vars
+)
+ggplot(df, aes(x = group, y = value, color = group)) +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.7) +
+  # Variance box
+  geom_rect(data = rects, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+            fill = NA, color = "red", linetype = "dashed", inherit.aes = FALSE) +
+  # Variance annotation
+  geom_text(data = rects, aes(x = group, y = ymax + 10, 
+                              label = paste0("Variance = ", round(var, 2))), 
+            color = "red", size = 4, inherit.aes = FALSE) +
+  # Mean point
+  geom_point(data = rects, aes(x = group, y = mean), color = "black", size = 4, inherit.aes = FALSE) +
+  labs(title = "Variance Visualized as a Box",
+       y = "Value") +
+  theme_bw()
+```
+
+
+<details>
+<summary><span style="color: red;">Click to show/hide code to generate the plot</span></summary>
+
+```{r}
+library(ggplot2)
+df <- data.frame(
+  value = c(group1, group2),
+  group = c(rep("group1", length(group1)), rep("group2", length(group2)))
+)
+
+# Calculate means and variances
+means <- tapply(df$value, df$group, mean)
+vars <- tapply(df$value, df$group, var)
+
+# Data for variance boxes
+rects <- data.frame(
+  group = c("group1", "group2"),
+  xmin = c(0.7, 1.7),
+  xmax = c(1.3, 2.3),
+  ymin = means - vars/2,
+  ymax = means + vars/2,
+  mean = means,
+  var = vars
+)
+ggplot(df, aes(x = group, y = value, color = group)) +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.7) +
+  # Variance box
+  geom_rect(data = rects, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+            fill = NA, color = "red", linetype = "dashed", inherit.aes = FALSE) +
+  # Variance annotation
+  geom_text(data = rects, aes(x = group, y = ymax + 10, 
+                              label = paste0("Variance = ", round(var, 2))), 
+            color = "red", size = 4, inherit.aes = FALSE) +
+  # Mean point
+  geom_point(data = rects, aes(x = group, y = mean), color = "black", size = 4, inherit.aes = FALSE) +
+  labs(title = "Variance Visualized as a Box",
+       y = "Value") +
+  theme_bw()
+```
+</details>
+
+<br>
+
+The T-test is performed using the `t.test()` function, which essentially tests for the difference in means of a variable between two groups. 
 
 ```{r}
 t.test(group1, group2)
 ```
+
 `t.test` saves a lot of information: the difference in means estimate, confidence interval for the difference conf.int, the p-value p.value, etc.
 
+<br>
+
+Without using the build in function, it will look something like this ;
+
+```{r}
+# Data
+group1 <- c(8, 8, 9, 9, 9, 11, 12, 13, 13, 14)
+group2 <- c(22, 23, 24, 24, 25, 26, 27, 20, 26, 28)
+
+# Calculate means
+mean1 <- mean(group1)
+mean2 <- mean(group2)
+
+# Calculate sample variances
+var1 <- var(group1)  # s1^2
+var2 <- var(group2)  # s2^2
+
+# Sample sizes
+n1 <- length(group1)
+n2 <- length(group2)
+
+# Standard error using variances
+se <- sqrt((var1 / n1) + (var2 / n2))
+
+# t-statistic
+t_stat <- (mean1 - mean2) / se
+
+# Degrees of freedom (Welch's)
+df <- ( (var1/n1 + var2/n2)^2 ) / 
+      ( ((var1/n1)^2)/(n1-1) + ((var2/n2)^2)/(n2-1) )
+
+# p-value
+p_value <- 2 * pt(-abs(t_stat), df)
+
+# Print results
+cat("p-value:", p_value, "\n")
+```
+
+---
 
 # RNA-sequencing analysis
 
@@ -165,29 +289,6 @@ t.test(group1, group2)
 - How can we repeat the analysis for 20,000 genes?
 - Where does the gene expression data comes from? **Sequencing**
 
-We can plot individual data as well
-
-```{r}
-library(ggplot2)
-
-# Create data frame
-df <- data.frame(
-  Height = c(group1, group2),
-  Group = rep(c("Normal", "Cancer"), times = c(length(group1), length(group2))),
-  Plant = paste("Plant", sprintf("%02d", 1:length(group1))))
-
-# Plot
-ggplot(df, aes(x = Group, y = Height, fill = Group)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~ Plant, scales = "free_x") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Individual Plant Heights by Group",
-       y = "Height",
-       x = "Plant") +
-  scale_fill_manual(values = c("Group 1" = "skyblue", "Group 2" = "salmon"))
-```
-
 
 ## Example data
 
@@ -196,14 +297,162 @@ ggplot(df, aes(x = Group, y = Height, fill = Group)) +
   - 10 cancer
 - About 20,000 genes
 
+## Load files in R 
 
+Lets load in the actual data from an experiment comparing a tumor and normal RNA-seq experiment.
 
-## Reading in data
-
-Lets read in actual data from an experiment comparing tumor and normal
-
-Read in counts
+First we read the in the sample data and look at the files. 
 
 ```{r}
-rawCounts <- 
+df.meta <- read.csv("../output/sample_data.csv")
+df.meta
 ```
+
+Check the number of samples (rows) in the data
+
+```{r}
+nrow(df.meta)
+```
+
+Check the number of tumor and normal samples
+
+```{r}
+table(df.meta$Tumor)
+```
+
+Now we read into R the RNA-seq data. Lets look at the data first **3** rows and **5** columns. Each row is a gene and each column is a sample.
+
+```{r}
+raw.counts <- read.csv("../output/raw_counts.csv", row.names = 1)
+raw.counts[1:3, 1:5]
+```
+
+How is the data structured? - It is a matrix. Each row is a gene and each column is a sample.  
+What are these numbers? - They are the number of reads that mapped to each gene.  
+
+![FIGURE 4 - Example of distibution of reads across genes.](images/04_Reads_distribution_5x5.png)
+
+## Performing RNA-seq analysis
+
+Imagine if we perform a t-test on each gene. Lets give the example of one gene. We know the first 15 samples are normal and the next 15 are tumors. 
+
+```{r}
+# Extract counts for the first gene as a numeric vector
+gene_counts <- as.numeric(raw.counts[1, ])
+
+# Create vectors for normal and tumor samples
+normal_counts <- gene_counts[1:15]
+tumor_counts <- gene_counts[16:30]
+
+# Perform t-test
+t_test_result <- t.test(normal_counts, tumor_counts)
+
+# Print results
+print(t_test_result)
+```
+
+It may be helpful to visualize the data to understand what is going on.
+
+```{r}
+# Assume df.meta$group contains "normal" and "tumor"
+group_colors <- ifelse(df.meta$group == "normal", "skyblue", "salmon")
+
+barplot(gene_counts, 
+        names.arg = df.meta$group, 
+        col = group_colors,
+        main = "Counts for Gene 1",
+        ylab = "Counts")
+```
+
+We will have to do 20,000 t-tests. This is not practical. And there are other considerations that needs to be accounted for, for example normalization..
+
+Lets now perform a differential expression analysis between tumor and normal samples. 
+
+One tools that we can use is **DESeq2**. This was designed by Michael Love, Wolfgang Huber and Simon Anders (bioinformatics group at EMBL Heidelberg, Germany). 
+
+Its starts by creating a DESeq2 object from the count data and the sample information. 
+
+```{r}
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(countData = raw.counts,
+                              colData = df.meta,
+                              design = ~ group)
+```
+
+We can examine what is inside the DESeqDataSet object.
+
+```{r}
+dds
+```
+
+Next we estimate the size factors and normalize the data. This is to account for the differences in sequencing depth between samples.
+
+```{r}
+dds <- estimateSizeFactors(dds)
+sizeFactors(dds)  # See the normalization factors
+normalized_counts <- counts(dds, normalized=TRUE)
+
+What the steps above does is that it divides the count data by the size factors to normalize the data.
+
+
+
+```{r}
+
+
+# 4. Size factor estimation (library size normalization)
+# Layman's explanation: Different samples may have different total read counts (like some test tubes have more liquid than others).
+# DESeq2 estimates a "size factor" for each sample to make them comparable, so we don't mistake more reads for more gene activity.
+dds <- estimateSizeFactors(dds)
+sizeFactors(dds)  # See the normalization factors
+
+# 5. Normalization
+# Layman's explanation: The counts are divided by their size factors, so all samples are on the same scale.
+normalized_counts <- counts(dds, normalized=TRUE)
+head(normalized_counts)
+
+# 6. Differential expression analysis
+# Layman's explanation: DESeq2 compares the groups (e.g., tumor vs normal) for each gene, taking into account the variability and normalization.
+dds <- DESeq(dds)
+res <- results(dds)  # This gives you log2 fold changes, p-values, etc.
+
+# 7. View top differentially expressed genes
+head(res[order(res$pvalue), ])
+
+# 8. MA plot
+# Layman's explanation: An MA plot shows, for each gene, the average expression (A) vs the log fold change (M) between groups.
+# It helps you see which genes are up or down in one group vs the other.
+plotMA(res, main="DESeq2 MA Plot", ylim=c(-5,5))
+
+# 9. Volcano plot (optional, for visualization)
+if (!requireNamespace("EnhancedVolcano", quietly = TRUE)) {
+  BiocManager::install("EnhancedVolcano")
+}
+library(EnhancedVolcano)
+EnhancedVolcano(res,
+                lab = rownames(res),
+                x = 'log2FoldChange',
+                y = 'pvalue',
+                title = 'Volcano plot')
+
+# 10. Save results
+write.csv(as.data.frame(res), "../output/deseq2_results.csv")
+
+# 11. Export normalized counts (optional)
+write.csv(as.data.frame(normalized_counts), "../output/normalized_counts.csv")
+```
+
+**Key steps explained in layman's terms:**
+- **Size factor estimation:** Adjusts for differences in sequencing depth between samples.
+- **Normalization:** Makes gene counts comparable across samples.
+- **Differential expression:** Finds genes that are statistically significantly different between groups.
+- **MA plot:** Visualizes the relationship between expression level and fold change.
+- **Volcano plot:** Shows both the size of the change and its statistical significance for each gene.
+
+**Tips:**
+- Always check your sample and group names match between your count matrix and metadata.
+- You can use `results(dds, contrast=c("Tumor", "tumor", "normal"))` to specify which group is numerator/denominator.
+- For more advanced options, see the DESeq2 vignette: https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html
+
+# References
+
+- 
