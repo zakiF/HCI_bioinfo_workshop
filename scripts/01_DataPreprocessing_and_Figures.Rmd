@@ -111,15 +111,18 @@ Lets get 15 normal and 15 primary tumor
 ```{r}
 sampleData_sub <- sampleData %>% 
   dplyr::select(Run, Factor.Value.biopsy.site.) %>% 
-  dplyr::rename(group = Factor.Value.biopsy.site.) 
+  dplyr::rename(group = Factor.Value.biopsy.site.) %>% 
+  # Remove these samples
+  filter(!Run %in% c("SRR975553", "SRR975563", "SRR975561", "SRR975556", "SRR975560", "SRR975557",
+                    "SRR975579", "SRR975580", "SRR975587")) 
 
 normal_samples <- sampleData_sub %>%
   filter(group == "normal") %>%
-  slice_sample(n = 15)
+  slice_sample(n = 12)
 
 tumor_samples <- sampleData_sub %>%
   filter(group == "primary tumor") %>%
-  slice_sample(n = 15)
+  slice_sample(n = 12)
 
 # Combine them into one data frame
 selected_samples <- bind_rows(normal_samples, tumor_samples) %>% 
